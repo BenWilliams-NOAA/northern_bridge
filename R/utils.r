@@ -215,3 +215,57 @@ multi_like <- function(par_names, par_ranges, obj, fit) {
   
   return(data.frame(grid, log_like=ll))
 }
+
+get_spawn_bio <- function(obj, post, iters=100) {
+  if(iters>nrow(post[[1]])) {iters = ncol(post[[1]])}
+  
+  sb = matrix(nrow=length(post)*iters, ncol=length(obj$report(post[[1]][1,])$spawn_bio))
+  for (i in 1:iters) {
+    for(j in 1:length(post)){
+      sb[i,] = obj$report(post[[j]][i,])$spawn_bio
+    }
+  }
+
+sb = data.frame(sb) 
+names(sb) = obj$report(post[[1]][1,])$years
+sb %>% 
+  dplyr::mutate(sim = 1:dplyr::n())  %>% 
+  tidyr::pivot_longer(-sim, values_to = 'spawn_bio', names_to = 'year') %>% 
+  dplyr::mutate(year = as.numeric(year))
+}
+
+get_tot_bio <- function(obj, post, iters=100) {
+  if(iters>nrow(post[[1]])) {iters = ncol(post[[1]])}
+  
+  sb = matrix(nrow=length(post)*iters, ncol=length(obj$report(post[[1]][1,])$tot_bio))
+  for (i in 1:iters) {
+    for(j in 1:length(post)){
+      sb[i,] = obj$report(post[[j]][i,])$tot_bio
+    }
+  }
+
+sb = data.frame(sb) 
+names(sb) = obj$report(post[[1]][1,])$years
+sb %>% 
+  dplyr::mutate(sim = 1:dplyr::n())  %>% 
+  tidyr::pivot_longer(-sim, values_to = 'tot_bio', names_to = 'year') %>% 
+  dplyr::mutate(year = as.numeric(year))
+}
+
+get_rec <- function(obj, post, iters=100) {
+  if(iters>nrow(post[[1]])) {iters = ncol(post[[1]])}
+  
+  sb = matrix(nrow=length(post)*iters, ncol=length(obj$report(post[[1]][1,])$recruits))
+  for (i in 1:iters) {
+    for(j in 1:length(post)){
+      sb[i,] = obj$report(post[[j]][i,])$recruits
+    }
+  }
+
+sb = data.frame(sb) 
+names(sb) = obj$report(post[[1]][1,])$years
+sb %>% 
+  dplyr::mutate(sim = 1:dplyr::n())  %>% 
+  tidyr::pivot_longer(-sim, values_to = 'recruits', names_to = 'year') %>% 
+  dplyr::mutate(year = as.numeric(year))
+}
