@@ -382,7 +382,8 @@ mcmc3 <- sample_sparse_tmb(obj3, iter=1200, warmup=400,
                           cores=5, metric='dense',
                           Qinv=M, Q=Q,
                           globals=list(data = data), 
-                          skip_optimization=TRUE)
+                          skip_optimization=TRUE,
+                          control = list(adapt_delta = 0.99))
 summary(mcmc3)
 summary(mcmc3$monitor$n_eff)
 summary(mcmc3$monitor$Rhat)
@@ -397,17 +398,17 @@ adnuts::plot_uncertainties(mcmc3)
 
 # get posterior for derived quantities
 
-get_spawn_bio(obj3, post, iters=500) -> ssb
+get_spawn_bio(obj3, post, iters=50) -> ssb
 ssb %>% 
   ggplot(aes(year, spawn_bio, group = sim)) + 
   geom_line(alpha = 0.2)
 
-get_tot_bio(obj3, post, iters=500) -> tb
+get_tot_bio(obj3, post, iters=50) -> tb
 tb %>% 
   ggplot(aes(year, tot_bio, group = sim)) + 
   geom_line(alpha = 0.2)
   
-get_rec(obj3, post, iters=500) -> recs
+get_rec(obj3, post, iters=50) -> recs
 recs %>% 
   ggplot(aes(year, recruits, group = sim)) + 
   geom_line(alpha = 0.2) +
@@ -698,3 +699,87 @@ df5 %>%
   geom_hline(yintercept=0, lty=3)
 
 # ggsave(here::here(2024, 'base_srv_like_iss', 'figs', "fac-diff.png"), width=6.5, height=6.5, units='in')
+
+# changes weights to 1 --------------
+data$srv_wt = 0.25
+data$fish_age_wt = 0.5
+data$srv_age_wt = 0.5
+data$fish_size_wt = 0.5
+data$wt_rec_var = 1
+data$wt_fmort_reg = 0.1
+
+obj4 <- RTMB::MakeADFun(f1, 
+                        pars2,
+                        map = list(sigmaR = factor(NA)))  
+# obj1$report(obj1$env$last.par.best)$spawn_bio
+fit4 <- nlminb(start = obj4$par,
+               objective = obj4$fn,
+               gradient = obj4$gr,
+               control = list(iter.max=100000,
+                              eval.max=20000),
+               lower = lower,
+               upper = upper)
+
+sdrep4 <- sdreport(obj4, getJointPrecision = TRUE)
+report4 <- obj4$report(obj4$env$last.par.best)
+proj_bio(report4) # higher values than orig
+proj_bio(report3)
+report4$M # M up a bit
+report$M
+report4$q # q down a bit
+report$q
+
+report4$nll
+report3$nll
+
+
+Q <- sdrep3$jointPrecision
+## if no random effects this will be NULL
+if(!is.null(Q)){
+  M <- solve(Q)
+} else {
+  M <- sdrep3$cov.fixed
+  Q <- solve(M)
+}         
+
+# Cole recommends 5 chains, 1000 iters, 250 warmup
+mcmc3 <- sample_sparse_tmb(obj3, iter=1200, warmup=400,
+                          init='random', chains=5,
+                          cores=5, metric='dense',
+                          Qinv=M, Q=Q,
+                          globals=list(data = data), 
+                          skip_optimization=TRUE,
+                          control = list(adapt_delta = 0.99))
+summary(mcmc3)
+summary(mcmc3$monitor$n_eff)
+summary(mcmc3$monitor$Rhat)
+post <- extract_samples(mcmc3, as.list=TRUE)
+postlist <- coda::mcmc.list(lapply(post, coda::mcmc))
+coda::traceplot(postlist)
+glimpse(post)
+sp <- extract_sampler_params(mcmc3)
+glimpse(sp)
+plot_marginals(mcmc3, pars=1:6)
+adnuts::plot_uncertainties(mcmc3)
+
+# get posterior for derived quantities
+
+get_spawn_bio(obj3, post, iters=50) -> ssb
+ssb %>% 
+  ggplot(aes(year, spawn_bio, group = sim)) + 
+  geom_line(alpha = 0.2)
+
+get_tot_bio(obj3, post, iters=50) -> tb
+tb %>% 
+  ggplot(aes(year, tot_bio, group = sim)) + 
+  geom_line(alpha = 0.2)
+  
+get_rec(obj3, post, iters=50) -> recs
+recs %>% 
+  ggplot(aes(year, recruits, group = sim)) + 
+  geom_line(alpha = 0.2) +
+  coord_cartesian(ylim = c(0, 300))
+
+pairs_admb(mcmc3, pars=1:6, order='slow')
+pairs_admb(mcmc3, pars=1:6, order='mismatch')
+launch_shinyadmb(mcmc3)
